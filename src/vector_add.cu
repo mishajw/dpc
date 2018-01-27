@@ -4,7 +4,7 @@
 #include "common.h"
 
 __global__ void add_array(int *a, int *b, int *result, int size) {
-  int index = blockDim.x * blockIdx.x + threadIdx.x;
+  int index = GLOBAL_INDEX;
   if (index < size) {
     result[index] = a[index] + b[index];
   }

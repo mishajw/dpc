@@ -6,3 +6,5 @@
     } \
   } while (0);
 
+#define GLOBAL_INDEX blockIdx.x * blockDim.x + threadIdx.x
+

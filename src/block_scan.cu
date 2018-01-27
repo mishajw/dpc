@@ -25,9 +25,9 @@ void host_bscan(num_t *input, num_t *result, size_t length) {
 
 __global__ 
 void single_thread_bscan(num_t *input, num_t *result, size_t length) {
-  int global_index = blockIdx.x * BLOCK_SIZE + threadIdx.x;
+  int index = GLOBAL_INDEX;
 
-  if (global_index > 0) {
+  if (index > 0) {
     return;
   }
 

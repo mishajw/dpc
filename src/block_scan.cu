@@ -8,77 +8,82 @@
 
 typedef float num_t;
 
-void reset(num_t *xs, size_t length) {
+const size_t ARRAY_SIZE = (LENGTH * sizeof(num_t));
+
+void reset(num_t *input, size_t length) {
   for (size_t i = 0; i < LENGTH; i++) {
-    xs[i] = 0;
+    input[i] = 0;
   }
 }
 
-void host_bscan(num_t *xs, num_t *ys, size_t length) {
-  ys[0] = xs[0];
+void host_bscan(num_t *input, num_t *result, size_t length) {
+  result[0] = input[0];
   for (size_t i = 1; i < length; i++) {
-    ys[i] = ys[i - 1] + xs[i];
+    result[i] = result[i - 1] + input[i];
   }
 }
 
 __global__ 
-void single_thread_bscan(num_t *xs, num_t *ys, size_t length) {
+void single_thread_bscan(num_t *input, num_t *result, size_t length) {
   int global_index = blockIdx.x * BLOCK_SIZE + threadIdx.x;
 
   if (global_index > 0) {
     return;
   }
 
-  ys[0] = xs[0];
+  result[0] = input[0];
   for (size_t i = 1; i < length; i++) {
-    ys[i] = ys[i - 1] + xs[i];
+    result[i] = result[i - 1] + input[i];
   }
 }
 
-void run_block_scan(int argc, char **argv) {
-  size_t array_size = LENGTH * sizeof(num_t);
-
-  num_t *xs = (num_t *)malloc(array_size);
-  num_t *truth_ys = (num_t *)malloc(array_size);
-  for (size_t i = 0; i < LENGTH; i++) {
-    xs[i] = 1;
-  }
-  host_bscan(xs, truth_ys, LENGTH);
-
-  num_t *device_xs = NULL;
-  CUDA_ERROR(cudaMalloc((void **) &device_xs, array_size), "Couldn't allocate device_xs");
+void test_function(void (*func)(num_t*, num_t*, size_t), num_t *input, num_t *truth) {
+  // Set up device arrays
+  num_t *device_input = NULL;
+  CUDA_ERROR(cudaMalloc((void **) &device_input, ARRAY_SIZE), "Couldn't allocate device_input");
   CUDA_ERROR(
-      cudaMemcpy(device_xs, xs, array_size, cudaMemcpyHostToDevice),
-      "Couldn't copy to device_xs");
-  num_t *device_ys = NULL;
-  CUDA_ERROR(cudaMalloc((void **) &device_ys, array_size), "Couldn't allocate device_ys");
+      cudaMemcpy(device_input, input, ARRAY_SIZE, cudaMemcpyHostToDevice),
+      "Couldn't copy to device_input");
+  num_t *device_result = NULL;
+  CUDA_ERROR(cudaMalloc((void **) &device_result, ARRAY_SIZE), "Couldn't allocate device_result");
 
+  // Run the function to test
   int num_blocks = ceil(float(LENGTH) / float(BLOCK_SIZE));
-  printf("%d\n", array_size);
-  single_thread_bscan<<<num_blocks, BLOCK_SIZE>>>(device_xs, device_ys, LENGTH);
+  func<<<num_blocks, BLOCK_SIZE>>>(device_input, device_result, LENGTH);
 
+  // Wait for the function to finish
   cudaDeviceSynchronize();
 
-  num_t *ys = (num_t *)malloc(array_size);
+  // Copy the results into host memory
+  num_t *result = (num_t *)malloc(ARRAY_SIZE);
   CUDA_ERROR(
-      cudaMemcpy(ys, device_ys, array_size, cudaMemcpyDeviceToHost),
-      "Couldn't copy to ys");
+      cudaMemcpy(result, device_result, ARRAY_SIZE, cudaMemcpyDeviceToHost),
+      "Couldn't copy to result");
 
+  // Check it against the truth
+  size_t num_incorrect = 0;
   for (size_t i = 0; i < LENGTH; i++) {
-    if (truth_ys[i] != ys[i]) {
+    if (truth[i] != result[i]) {
       fprintf(
           stderr,
           "Incorrect value at index %d: Expected %f, got %f\n",
           i,
-          truth_ys[i],
-          ys[i]);
+          truth[i],
+          result[i]);
+      num_incorrect++;
     }
   }
+  printf("Number of incorrect results: %ld\n", num_incorrect);
+}
 
-  printf("Result: ");
+void run_block_scan(int argc, char **argv) {
+  num_t *input = (num_t *)malloc(ARRAY_SIZE);
+  num_t *truth = (num_t *)malloc(ARRAY_SIZE);
   for (size_t i = 0; i < LENGTH; i++) {
-    printf("%f, ", ys[i]);
+    input[i] = 1;
   }
-  printf("\n");
+  host_bscan(input, truth, LENGTH);
+
+  test_function(single_thread_bscan, input, truth);
 }
 

@@ -1,13 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 
-#define CUDA_ERROR(statement, message) \
-  do { \
-    err = statement; \
-    if (err != cudaSuccess) { \
-      fprintf(stderr, "%s: %s\n", message, cudaGetErrorString(err)); \
-    } \
-  } while (0);
+#include "common.h"
 
 __global__ void add_array(int *a, int *b, int *result, int size) {
   int index = blockDim.x * blockIdx.x + threadIdx.x;
@@ -17,7 +11,6 @@ __global__ void add_array(int *a, int *b, int *result, int size) {
 }
 
 void run_vector_add(int argc, char **argv) {
-  cudaError_t err;
   int num_elements = 1024;
   size_t size = num_elements * sizeof(int);
   int *a = (int *) malloc(size);

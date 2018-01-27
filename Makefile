@@ -22,13 +22,13 @@ $(executable_path): $(srcs) | $(bin_dir)
 build: $(executable_path)
 
 run: build
-	$(executable_path)
+	$(executable_path) $(args)
 
 remote-build: remote-deploy
-	ssh ${remote_host} "cd $(remote_path) && make build"
+	ssh ${remote_host} "cd $(remote_path) && $(MAKE) build"
 
 remote-run: remote-deploy
-	ssh ${remote_host} "cd $(remote_path) && make run"
+	ssh ${remote_host} "cd $(remote_path) && $(MAKE) args=$(args) run"
 
 remote-deploy:
 	rsync -ra --exclude "*.git" . $(remote_host):$(remote_path)

@@ -37,6 +37,29 @@ void single_thread_bscan(num_t *input, num_t *result, size_t length) {
   }
 }
 
+__global__
+void hsh_nsm_bscan(num_t *input, num_t *result, size_t length) {
+  // TODO: This should not use shared memory, but in order to solve the read/write conflict
+  // between blocks, we need to create an array 2x the size of `length` - how to solve this
+  // easily without shared memory?
+
+  int index = GLOBAL_INDEX;
+
+  for (int stride = 1; stride <= length / 2; stride *= 2) {
+    __syncthreads();
+
+    bool should_add = index >= stride && index < length;
+
+    if (!should_add) {
+      continue;
+    }
+
+    input[index] = input[index] + input[index - stride];
+  }
+
+  result[index] = input[index];
+}
+
 void test_function(void (*func)(num_t*, num_t*, size_t), num_t *input, num_t *truth) {
   // Set up device arrays
   num_t *device_input = NULL;

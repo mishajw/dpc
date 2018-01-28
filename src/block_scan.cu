@@ -60,6 +60,38 @@ void hsh_nsm_bscan(num_t *input, num_t *result, size_t length) {
   result[index] = input[index];
 }
 
+__global__
+void hsh_bscan(num_t *input, num_t *result, size_t length) {
+  __shared__ num_t buffer[BLOCK_SIZE * 2];
+  num_t *read_buffer = buffer;
+  num_t *write_buffer = &buffer[blockDim.x];
+
+  int index = GLOBAL_INDEX;
+
+  if (index < length) {
+    read_buffer[threadIdx.x] = input[index];
+  }
+
+  for (int stride = 1; stride <= blockDim.x / 2; stride *= 2) {
+    __syncthreads();
+
+    if (threadIdx.x >= stride) {
+      write_buffer[threadIdx.x] = read_buffer[threadIdx.x] + read_buffer[threadIdx.x - stride];
+    } else {
+      write_buffer[threadIdx.x] = read_buffer[threadIdx.x];
+    }
+
+    // Switch the read and write buffers
+    num_t *tmp_buffer = read_buffer;
+    read_buffer = write_buffer;
+    write_buffer = tmp_buffer;
+  }
+
+  if (index < length) {
+    result[index] = read_buffer[threadIdx.x];
+  }
+}
+
 void test_function(void (*func)(num_t*, num_t*, size_t), num_t *input, num_t *truth) {
   // Set up device arrays
   num_t *device_input = NULL;

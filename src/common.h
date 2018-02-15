@@ -3,6 +3,7 @@
     cudaError_t err = statement; \
     if (err != cudaSuccess) { \
       fprintf(stderr, "%s: %s\n", message, cudaGetErrorString(err)); \
+      exit(1); \
     } \
   } while (0);
 
